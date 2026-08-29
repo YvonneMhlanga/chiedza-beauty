@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #fcfaf7;
+  color: #0b2239;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ============ GRADIENTS ============ */
+.gradient-primary {
+  background: linear-gradient(135deg, #0B2239 0%, #1a3a52 100%);
+}
+
+.gradient-secondary {
+  background: linear-gradient(135deg, #0B2239 0%, #F5AD00 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, #8F0F3F 0%, #F5AD00 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #0B2239 0%, #F5AD00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Component classes live in the `components` layer so that Tailwind utility
+   classes on an element (e.g. `pl-11` on top of `.input-base`) always win. */
+@layer components {
+  /* ============ BUTTONS ============ */
+  .btn-primary {
+    @apply px-6 py-3 bg-secondary text-primary rounded-lg font-bold hover:bg-yellow-500 transition-all duration-300 shadow-md hover:shadow-lg;
+  }
+
+  .btn-primary-dark {
+    @apply px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-gray-900 transition-all duration-300 shadow-md hover:shadow-lg;
+  }
+
+  .btn-outline {
+    @apply px-6 py-3 border-2 border-primary text-primary rounded-lg font-bold hover:bg-primary hover:text-white transition-all duration-300;
+  }
+
+  .btn-outline-accent {
+    @apply px-6 py-3 bg-white border-2 border-accent text-accent rounded-lg font-bold hover:bg-accent hover:text-white transition-all duration-300;
+  }
+
+  .btn-outline-white {
+    @apply px-6 py-3 border-2 border-white text-white rounded-lg font-bold hover:bg-white hover:text-primary transition-all duration-300;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-accent text-white rounded-lg font-bold hover:bg-red-700 transition-all duration-300 shadow-md hover:shadow-lg;
+  }
+
+  /* ============ INPUTS ============ */
+  .input-base {
+    @apply w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary focus:ring-opacity-30 transition-all duration-300 bg-white text-primary;
+  }
+
+  .input-base::placeholder {
+    @apply text-gray-500;
+  }
+
+  /* ============ CARDS ============ */
+  .card-base {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+
+  /* ============ BADGES ============ */
+  .badge-primary {
+    @apply inline-block px-3 py-1 bg-secondary bg-opacity-15 text-primary rounded-full text-xs font-bold;
+  }
+
+  .badge-secondary {
+    @apply inline-block px-3 py-1 bg-accent bg-opacity-15 text-accent rounded-full text-xs font-bold;
+  }
+
+  .badge-gold {
+    @apply inline-block px-3 py-1 bg-secondary rounded-full text-xs font-bold text-primary;
+  }
+
+  /* ============ UTILITIES ============ */
+  .section-spacing {
+    @apply py-16 md:py-20;
+  }
+}
+
+/* ============ SCROLLBAR ============ */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #f5ad00;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0b2239;
+}
