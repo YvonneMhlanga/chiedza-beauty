@@ -56,6 +56,9 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'Chiedza Beauty API is running!' });
 });
 
+// Make sure there is browsable demo content (no-op if the DB already has data)
+require('./seedIfEmpty')();
+
 // 404 handler - unknown route
 app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });

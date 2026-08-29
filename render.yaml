@@ -1,0 +1,29 @@
+# Render Blueprint for the Chiedza Beauty backend (Express + SQLite).
+# render.com -> New -> Blueprint -> pick this repo. It creates the web service below.
+#
+# The frontend (repo root) stays on Vercel. After this deploys, copy the service
+# URL and set it on Vercel as:  NEXT_PUBLIC_API_URL = https://<service>.onrender.com/api
+#
+# Free plan note: the disk is ephemeral, so user sign-ups / bookings / uploaded
+# photos reset on each redeploy. Demo salons/styles re-seed automatically on boot.
+# For permanent data, move to a paid disk or a hosted Postgres.
+
+services:
+  - type: web
+    name: chiedza-backend
+    runtime: node
+    plan: free
+    rootDir: chiedza-backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Optional: pin the Google OAuth client id server-side. If blank, the
+      # backend trusts (and still fully verifies) the id the frontend sends.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
