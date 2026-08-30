@@ -4,9 +4,11 @@
 # The frontend (repo root) stays on Vercel. After this deploys, copy the service
 # URL and set it on Vercel as:  NEXT_PUBLIC_API_URL = https://<service>.onrender.com/api
 #
-# For permanent data set DATABASE_URL (Neon Postgres) and CLOUDINARY_URL below.
-# Without them the app runs on SQLite + local disk, which the free plan wipes on
-# each redeploy (demo salons/styles still re-seed automatically on boot).
+# For permanent data set DATABASE_URL (Neon Postgres) below. With it, uploaded
+# images are stored in Postgres too (served from /api/uploads/file/:id) — no
+# image host needed. Optionally set CLOUDINARY_URL to use Cloudinary instead.
+# Without DATABASE_URL the app runs on SQLite + local disk, which the free plan
+# wipes on each redeploy (demo salons/styles still re-seed on boot).
 
 services:
   - type: web
@@ -27,8 +29,8 @@ services:
       # dashboard. Leave unset to fall back to SQLite.
       - key: DATABASE_URL
         sync: false
-      # Cloudinary account URL (cloudinary://<key>:<secret>@<cloud>). Leave unset
-      # to store uploads on local disk.
+      # Optional: use Cloudinary for images instead of Postgres
+      # (cloudinary://<key>:<secret>@<cloud>). Leave unset to store in Postgres.
       - key: CLOUDINARY_URL
         sync: false
       # Optional: pin the Google OAuth client id server-side. If blank, the

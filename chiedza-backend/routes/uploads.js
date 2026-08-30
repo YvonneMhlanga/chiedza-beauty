@@ -7,26 +7,35 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 
-// Store images on Cloudinary when configured (CLOUDINARY_URL), otherwise on the
-// local disk. Local disk is fine for dev but is wiped on redeploy on most hosts.
-const useCloud = !!process.env.CLOUDINARY_URL;
+/**
+ * Image storage, in priority order:
+ *   'cloudinary' — if CLOUDINARY_URL is set
+ *   'db'         — binary stored in the `uploads` table (default on Postgres)
+ *   'disk'       — local uploads/ folder (default for local SQLite dev)
+ * Override with IMAGE_STORE=cloudinary|db|disk.
+ */
+const imageStore = process.env.CLOUDINARY_URL
+  ? 'cloudinary'
+  : process.env.IMAGE_STORE || (db.dialect === 'pg' ? 'db' : 'disk');
+
 let cloudinary;
-if (useCloud) {
-  cloudinary = require('cloudinary').v2; // reads CLOUDINARY_URL from the env
-}
+if (imageStore === 'cloudinary') cloudinary = require('cloudinary').v2;
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
-if (!useCloud && !fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+if (imageStore === 'disk' && !fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
-const storage = useCloud
-  ? multer.memoryStorage()
-  : multer.diskStorage({
-      destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-      filename: (req, file, cb) => {
-        const ext = (path.extname(file.originalname) || '.jpg').toLowerCase();
-        cb(null, `${uuidv4()}${ext}`);
-      },
-    });
+const storage =
+  imageStore === 'disk'
+    ? multer.diskStorage({
+        destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+        filename: (req, file, cb) => {
+          const ext = (path.extname(file.originalname) || '.jpg').toLowerCase();
+          cb(null, `${uuidv4()}${ext}`);
+        },
+      })
+    : multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -37,15 +46,28 @@ const upload = multer({
   },
 });
 
-// Persist an uploaded file and return the URL to store in the DB.
+// Persist an uploaded file and resolve to the URL/path stored in the DB.
 function persist(file) {
-  if (!useCloud) return Promise.resolve(`/uploads/${file.filename}`);
+  if (imageStore === 'disk') {
+    return Promise.resolve(`/uploads/${file.filename}`);
+  }
+  if (imageStore === 'cloudinary') {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'chiedza', resource_type: 'image' },
+        (err, result) => (err ? reject(err) : resolve(result.secure_url))
+      );
+      stream.end(file.buffer);
+    });
+  }
+  // 'db' — store the bytes in the uploads table, serve via /api/uploads/file/:id
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'chiedza', resource_type: 'image' },
-      (err, result) => (err ? reject(err) : resolve(result.secure_url))
+    const id = uuidv4();
+    db.run(
+      'INSERT INTO uploads (id, data, mime) VALUES (?, ?, ?)',
+      [id, file.buffer, file.mimetype],
+      (err) => (err ? reject(err) : resolve(`/api/uploads/file/${id}`))
     );
-    stream.end(file.buffer);
   });
 }
 
@@ -55,10 +77,23 @@ function destroyImage(url) {
   if (/^https?:\/\/res\.cloudinary\.com\//.test(url)) {
     const m = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
     if (m && cloudinary) cloudinary.uploader.destroy(m[1]).catch(() => {});
+  } else if (url.startsWith('/api/uploads/file/')) {
+    db.run('DELETE FROM uploads WHERE id = ?', [url.split('/').pop()], () => {});
   } else if (url.startsWith('/uploads/')) {
     fs.unlink(path.join(UPLOAD_DIR, path.basename(url)), () => {});
   }
 }
+
+// ── Public: serve an image stored in the database ─────────────────────────
+router.get('/file/:id', (req, res) => {
+  db.get('SELECT data, mime FROM uploads WHERE id = ?', [req.params.id], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.set('Content-Type', row.mime || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data));
+  });
+});
 
 // Auth guard — reads the Bearer token and puts userId on req.
 function requireAuth(req, res, next) {

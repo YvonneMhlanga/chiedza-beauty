@@ -8,7 +8,8 @@ import Avatar from '@/components/Avatar';
 import { api, assetUrl, type Conversation, type Message, type ChatUser } from '@/lib/api';
 import { getToken, getStoredUser } from '@/lib/auth';
 
-const IMG_LINE = /^(https?:\/\/\S+|\/uploads\/\S+)\.(jpe?g|png|webp|gif)$/i;
+const IMG_LINE =
+  /^(https?:\/\/\S+\.(jpe?g|png|webp|gif)|\/uploads\/\S+\.(jpe?g|png|webp|gif)|\/api\/uploads\/file\/[\w-]+)$/i;
 
 // Split a message body so lines that are just an image URL render as a thumbnail.
 function renderBody(body: string) {

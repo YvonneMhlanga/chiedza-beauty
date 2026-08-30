@@ -109,6 +109,13 @@ function schemaStatements(d) {
       readAt ${TS_NULL},
       createdAt ${TS}
     )`,
+    // Binary image storage, used when there is no external image host configured.
+    `CREATE TABLE IF NOT EXISTS uploads (
+      id TEXT PRIMARY KEY,
+      data ${d === 'pg' ? 'BYTEA' : 'BLOB'} NOT NULL,
+      mime TEXT,
+      createdAt ${TS}
+    )`,
   ];
 }
 
@@ -137,7 +144,10 @@ if (usePg) {
   // ── Postgres driver ─────────────────────────────────────────────────────
   const { Pool } = require('pg');
   const cs = process.env.DATABASE_URL;
-  const needsSsl = /neon\.tech|render\.com|amazonaws\.com|sslmode=require/i.test(cs) || process.env.PGSSL === 'require';
+  // Hosted Postgres (Neon, Supabase, Render, …) all require SSL. Only skip it
+  // for an explicit local connection or when PGSSL=disable.
+  const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(cs);
+  const needsSsl = !isLocal && process.env.PGSSL !== 'disable';
   const pool = new Pool({
     connectionString: cs,
     ssl: needsSsl ? { rejectUnauthorized: false } : false,
