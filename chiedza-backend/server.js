@@ -2,9 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const multer = require('multer');
 
 dotenv.config();
+
+const db = require('./db');
 
 const app = express();
 
@@ -56,9 +57,6 @@ app.get('/api/health', (req, res) => {
   res.json({ message: 'Chiedza Beauty API is running!' });
 });
 
-// Make sure there is browsable demo content (no-op if the DB already has data)
-require('./seedIfEmpty')();
-
 // 404 handler - unknown route
 app.use((req, res) => {
   res.status(404).json({ error: `Route not found: ${req.method} ${req.originalUrl}` });
@@ -71,12 +69,22 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`
+
+// Create tables / run migrations, seed demo content if empty, then listen.
+db.init()
+  .then(() => require('./seedIfEmpty')())
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`
 ╔════════════════════════════════════╗
 ║    CHIEDZA BEAUTY API RUNNING    ║
-║   PORT: ${PORT}                          
-║   URL: http://localhost:${PORT}      
+║   PORT: ${PORT}
+║   DB:   ${db.dialect}
 ╚════════════════════════════════════╝
   `);
-});
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Database init failed:', err);
+    process.exit(1);
+  });

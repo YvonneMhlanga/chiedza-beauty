@@ -1,5 +1,15 @@
 // Seed the database with demo salons, styles and stylists.
 // Usage: npm run seed   (from the chiedza-backend/ folder)
+// SQLite / local dev only — with Postgres, the server auto-seeds demo content
+// on start (see seedIfEmpty.js), so this script is not needed there.
+
+if (process.env.DATABASE_URL) {
+  console.error(
+    'seed.js is for local SQLite only. With DATABASE_URL set, demo content is ' +
+      'seeded automatically when the server starts.'
+  );
+  process.exit(1);
+}
 
 const db = require('./db');
 const { salons, styles, stylists } = require('./data/seed-data');
