@@ -13,12 +13,46 @@ const db = require('../db');
 const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || '').trim();
 const googleClient = new OAuth2Client();
 
+// Domains that mark a user as a verified student (comma separated).
+// Default matches Zimbabwean academic addresses like h230438j@hit.ac.zw.
+const STUDENT_DOMAINS = (process.env.STUDENT_EMAIL_DOMAINS || '.ac.zw,.edu')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+// Emails that get admin access (comma separated).
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+const isStudentEmail = (email) =>
+  STUDENT_DOMAINS.some((d) => email.endsWith(d) || email.includes(d + '.'));
+const isAdminEmail = (email) => ADMIN_EMAILS.includes(email);
+
 function issueToken(user) {
   return jwt.sign(
     { userId: user.id, email: user.email, userType: user.userType },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
+}
+
+// Shape the user object we return to the frontend.
+function publicUser(u, extra = {}) {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    userType: u.userType,
+    username: u.username || null,
+    phone: u.phone || null,
+    location: u.location || null,
+    profileImage: u.profileImage || null,
+    isStudent: u.isStudent ? 1 : 0,
+    isAdmin: u.isAdmin ? 1 : 0,
+    ...extra,
+  };
 }
 
 // Register
@@ -34,20 +68,44 @@ router.post('/register', (req, res) => {
 
   const hashedPassword = bcrypt.hashSync(password, 10);
   const userId = uuidv4();
+  const student = isStudentEmail(email) ? 1 : 0;
+  const admin = isAdminEmail(email) ? 1 : 0;
+
+  // Optional profile details captured at sign-up (meeting spec).
+  const b = req.body;
+  const cols = ['id', 'name', 'email', 'password', 'userType', 'isStudent', 'isAdmin'];
+  const vals = [userId, name, email, hashedPassword, userType, student, admin];
+  const extras = {
+    username: b.username,
+    dateOfBirth: b.dateOfBirth,
+    occupation: b.occupation,
+    hairType: b.hairType,
+    hairProducts: b.hairProducts,
+    location: b.location,
+    experience: b.experience,
+    serviceTime: b.serviceTime,
+    startingPrice: b.startingPrice,
+  };
+  for (const [k, v] of Object.entries(extras)) {
+    if (v !== undefined && v !== null && v !== '') {
+      cols.push(k);
+      vals.push(v);
+    }
+  }
+  const placeholders = cols.map(() => '?').join(', ');
 
   db.run(
-    'INSERT INTO users (id, name, email, password, userType) VALUES (?, ?, ?, ?, ?)',
-    [userId, name, email, hashedPassword, userType],
+    `INSERT INTO users (${cols.join(', ')}) VALUES (${placeholders})`,
+    vals,
     (err) => {
       if (err) {
         return res.status(400).json({ error: 'Email already exists' });
       }
-
       const token = jwt.sign({ userId, email, userType }, process.env.JWT_SECRET, { expiresIn: '7d' });
       res.json({
         message: 'User registered successfully',
         token,
-        user: { id: userId, name, email, userType },
+        user: publicUser({ id: userId, name, email, userType, username: b.username, isStudent: student, isAdmin: admin }),
       });
     }
   );
@@ -72,6 +130,13 @@ router.post('/login', (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Keep admin/student flags in sync with the env lists on every login.
+    const student = user.isStudent || isStudentEmail(user.email) ? 1 : 0;
+    const admin = user.isAdmin || isAdminEmail(user.email) ? 1 : 0;
+    if (student !== (user.isStudent || 0) || admin !== (user.isAdmin || 0)) {
+      db.run('UPDATE users SET isStudent = ?, isAdmin = ? WHERE id = ?', [student, admin, user.id]);
+    }
+
     const token = jwt.sign(
       { userId: user.id, email: user.email, userType: user.userType },
       process.env.JWT_SECRET,
@@ -80,15 +145,7 @@ router.post('/login', (req, res) => {
     res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        location: user.location,
-        userType: user.userType,
-        profileImage: user.profileImage || null,
-      }
+      user: publicUser(user, { isStudent: student, isAdmin: admin }),
     });
   });
 });
@@ -128,26 +185,28 @@ router.post('/google', async (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
 
+    const student = isStudentEmail(email) ? 1 : 0;
+    const admin = isAdminEmail(email) ? 1 : 0;
+
     if (existing) {
       const respond = (profileImage) =>
         res.json({
           message: 'Login successful',
           token: issueToken(existing),
-          user: {
-            id: existing.id,
-            name: existing.name,
-            email: existing.email,
-            phone: existing.phone,
-            location: existing.location,
-            userType: existing.userType,
+          user: publicUser(existing, {
             profileImage,
-          },
+            isStudent: existing.isStudent || student,
+            isAdmin: existing.isAdmin || admin,
+          }),
         });
 
-      // Only fill the photo from Google if they haven't set one themselves.
-      if (!existing.profileImage && picture) {
-        return db.run('UPDATE users SET profileImage = ? WHERE id = ?', [picture, existing.id], () =>
-          respond(picture)
+      const needFlags = student !== (existing.isStudent || 0) || admin !== (existing.isAdmin || 0);
+      if ((!existing.profileImage && picture) || needFlags) {
+        const img = existing.profileImage || picture;
+        return db.run(
+          'UPDATE users SET profileImage = ?, isStudent = ?, isAdmin = ? WHERE id = ?',
+          [img, existing.isStudent || student, existing.isAdmin || admin, existing.id],
+          () => respond(img || null)
         );
       }
       return respond(existing.profileImage || null);
@@ -157,14 +216,14 @@ router.post('/google', async (req, res) => {
     const userId = uuidv4();
     const randomHash = bcrypt.hashSync(uuidv4(), 10);
     db.run(
-      'INSERT INTO users (id, name, email, password, userType, profileImage) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, name, email, randomHash, userType, picture],
+      'INSERT INTO users (id, name, email, password, userType, profileImage, isStudent, isAdmin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, name, email, randomHash, userType, picture, student, admin],
       (insertErr) => {
         if (insertErr) {
           return res.status(500).json({ error: 'Could not create account' });
         }
-        const user = { id: userId, name, email, userType, profileImage: picture };
-        res.json({ message: 'User registered successfully', token: issueToken(user), user });
+        const user = publicUser({ id: userId, name, email, userType, profileImage: picture, isStudent: student, isAdmin: admin });
+        res.json({ message: 'User registered successfully', token: issueToken({ id: userId, email, userType }), user });
       }
     );
   });
@@ -241,12 +300,19 @@ router.get('/me', (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    db.get('SELECT id, name, email, phone, location, bio, profileImage, userType, specialty, experience, startingPrice, available FROM users WHERE id = ?', [decoded.userId], (err, user) => {
-      if (err || !user) {
-        return res.status(404).json({ error: 'User not found' });
+    db.get(
+      `SELECT id, name, email, username, phone, location, bio, profileImage, userType,
+              specialty, experience, startingPrice, available, serviceTime,
+              dateOfBirth, occupation, hairType, hairProducts, isStudent, isAdmin
+       FROM users WHERE id = ?`,
+      [decoded.userId],
+      (err, user) => {
+        if (err || !user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(user);
       }
-      res.json(user);
-    });
+    );
   } catch (err) {
     res.status(401).json({ error: 'Invalid token' });
   }
@@ -264,7 +330,11 @@ router.put('/profile', (req, res) => {
 
     // Only update the fields that were actually sent, so a client saving their
     // form never wipes braider-only columns and vice versa.
-    const allowed = ['name', 'phone', 'location', 'bio', 'specialty', 'experience', 'startingPrice', 'available'];
+    const allowed = [
+      'name', 'username', 'phone', 'location', 'bio', 'specialty', 'experience',
+      'startingPrice', 'available', 'serviceTime', 'dateOfBirth', 'occupation',
+      'hairType', 'hairProducts',
+    ];
     const sets = [];
     const vals = [];
     for (const field of allowed) {

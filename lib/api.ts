@@ -56,6 +56,7 @@ export interface Stylist {
   imageUrl: string;
   location?: string;
   available?: number;
+  serviceTime?: string;
   portfolio?: string[];
 }
 
@@ -66,7 +67,10 @@ export interface AuthUser {
   name: string;
   email: string;
   userType: UserType;
+  username?: string | null;
   profileImage?: string | null;
+  isStudent?: number;
+  isAdmin?: number;
 }
 
 export interface Me extends AuthUser {
@@ -77,6 +81,33 @@ export interface Me extends AuthUser {
   experience?: string | null;
   startingPrice?: string | null;
   available?: number;
+  serviceTime?: string | null;
+  dateOfBirth?: string | null;
+  occupation?: string | null;
+  hairType?: string | null;
+  hairProducts?: string | null;
+}
+
+export interface RegisterExtras {
+  username?: string;
+  dateOfBirth?: string;
+  occupation?: string;
+  hairType?: string;
+  hairProducts?: string;
+  location?: string;
+  experience?: string;
+  serviceTime?: string;
+  startingPrice?: string;
+}
+
+export interface Slot {
+  id: string;
+  braiderId: string;
+  date: string;
+  startTime: string;
+  endTime: string | null;
+  booked: number;
+  bookingId?: string | null;
 }
 
 export interface PortfolioItem {
@@ -129,6 +160,7 @@ export interface Booking {
   refImage: string | null;
   status: BookingStatus;
   createdAt: string;
+  slotId?: string | null;
   // joined fields
   braiderName?: string | null;
   braiderPhone?: string | null;
@@ -137,6 +169,7 @@ export interface Booking {
   clientName?: string | null;
   clientPhone?: string | null;
   clientImage?: string | null;
+  needsFollowUp?: boolean;
 }
 
 export interface NewBooking {
@@ -144,11 +177,36 @@ export interface NewBooking {
   salonId?: string;
   styleId?: string;
   styleTitle?: string;
-  date: string;
+  date?: string;
   time?: string;
   service?: string;
   note?: string;
   refImage?: string;
+  slotId?: string;
+}
+
+export interface AdminStats {
+  clients: number;
+  braiders: number;
+  students: number;
+  bookings: number;
+  pending: number;
+  confirmed: number;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  username: string | null;
+  email: string;
+  userType: UserType;
+  isStudent: number;
+  isAdmin: number;
+  phone: string | null;
+  location: string | null;
+  occupation: string | null;
+  hairType: string | null;
+  createdAt: string;
 }
 
 export interface AuthResponse {
@@ -198,10 +256,16 @@ export const api = {
   getStylist: (id: string) => request<Stylist>(`/stylists/${id}`),
 
   // Auth
-  register: (name: string, email: string, password: string, userType: UserType = 'client') =>
+  register: (
+    name: string,
+    email: string,
+    password: string,
+    userType: UserType = 'client',
+    extras: RegisterExtras = {}
+  ) =>
     request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, userType }),
+      body: JSON.stringify({ name, email, password, userType, ...extras }),
     }),
 
   login: (email: string, password: string) =>
@@ -342,4 +406,34 @@ export const api = {
       headers: authHeader(token),
       body: JSON.stringify({ status }),
     }),
+
+  // ── Availability ─────────────────────────────────────────────────────────
+  getBraiderSlots: (braiderId: string) =>
+    request<Slot[]>(`/availability/${braiderId}`),
+
+  getMySlots: (token: string) =>
+    request<Slot[]>('/availability', { headers: authHeader(token) }),
+
+  addSlot: (token: string, data: { date: string; startTime: string; endTime?: string }) =>
+    request<Slot>('/availability', {
+      method: 'POST',
+      headers: authHeader(token),
+      body: JSON.stringify(data),
+    }),
+
+  deleteSlot: (token: string, id: string) =>
+    request<{ message: string }>(`/availability/${id}`, {
+      method: 'DELETE',
+      headers: authHeader(token),
+    }),
+
+  // ── Admin ────────────────────────────────────────────────────────────────
+  adminStats: (token: string) =>
+    request<AdminStats>('/admin/stats', { headers: authHeader(token) }),
+
+  adminUsers: (token: string) =>
+    request<AdminUser[]>('/admin/users', { headers: authHeader(token) }),
+
+  adminBookings: (token: string) =>
+    request<Booking[]>('/bookings/all', { headers: authHeader(token) }),
 };

@@ -15,6 +15,41 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  db.get('SELECT isAdmin FROM users WHERE id = ?', [req.userId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!row || !row.isAdmin) return res.status(403).json({ error: 'Admins only' });
+    next();
+  });
+}
+
+// ── Admin: every booking on the platform, flagging ones that need follow-up ──
+router.get('/all', requireAuth, requireAdmin, (req, res) => {
+  db.all(
+    `SELECT b.*, c.name AS clientName, c.phone AS clientPhone,
+            br.name AS braiderName, br.phone AS braiderPhone
+     FROM bookings b
+     LEFT JOIN users c ON c.id = b.userId
+     LEFT JOIN users br ON br.id = b.braiderId
+     ORDER BY b.createdAt DESC`,
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      const staleMs = 6 * 60 * 60 * 1000; // pending & older than 6h -> follow up
+      const now = Date.now();
+      res.json(
+        rows.map((b) => ({
+          ...b,
+          needsFollowUp:
+            b.status === 'pending' &&
+            b.createdAt &&
+            now - new Date(b.createdAt).getTime() > staleMs,
+        }))
+      );
+    }
+  );
+});
+
 // Bookings a braider has RECEIVED (their dashboard)
 router.get('/received', requireAuth, (req, res) => {
   db.all(
@@ -52,11 +87,9 @@ router.get('/', requireAuth, (req, res) => {
 // Create a booking request
 router.post('/', requireAuth, (req, res) => {
   const me = req.userId;
-  const { braiderId, salonId, styleId, styleTitle, date, time, service, note, refImage } = req.body;
+  const { braiderId, salonId, styleId, styleTitle, service, note, refImage, slotId } = req.body;
+  let { date, time } = req.body;
 
-  if (!date || (!service && !styleTitle)) {
-    return res.status(400).json({ error: 'Pick a date and a style or service' });
-  }
   if (!braiderId && !salonId) {
     return res.status(400).json({ error: 'A braider or salon is required' });
   }
@@ -64,32 +97,36 @@ router.post('/', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'You cannot book yourself' });
   }
 
-  const finish = (braiderName) => {
+  const finish = (braiderName, slot) => {
+    if (slot) {
+      date = slot.date;
+      time = slot.startTime + (slot.endTime ? `–${slot.endTime}` : '');
+    }
+    if (!date || (!service && !styleTitle)) {
+      return res.status(400).json({ error: 'Pick a time slot and a style or service' });
+    }
+
     const id = uuidv4();
     db.run(
-      `INSERT INTO bookings (id, userId, salonId, braiderId, styleId, styleTitle, date, time, service, note, refImage)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bookings (id, userId, salonId, braiderId, styleId, styleTitle, date, time, service, note, refImage, slotId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id,
-        me,
-        salonId || '',
-        braiderId || null,
-        styleId || null,
-        styleTitle || null,
-        date,
-        time || '',
-        service || styleTitle || '',
-        note || '',
-        refImage || null,
+        id, me, salonId || '', braiderId || null, styleId || null, styleTitle || null,
+        date, time || '', service || styleTitle || '', note || '', refImage || null, slot ? slot.id : null,
       ],
       (err) => {
         if (err) return res.status(500).json({ error: 'Booking failed' });
 
-        // Drop a message into the chat so the braider is notified right away.
+        // Reserve the slot so no one else can take it.
+        if (slot) {
+          db.run('UPDATE availability SET booked = 1, bookingId = ? WHERE id = ?', [id, slot.id]);
+        }
+
+        // Notify the braider in chat.
         if (braiderId) {
           const lines = [
             `📅 Booking request: ${service || styleTitle}`,
-            `Date: ${date}${time ? ` at ${time}` : ''}`,
+            `When: ${date}${time ? ` at ${time}` : ''}`,
           ];
           if (note) lines.push(note);
           if (refImage) lines.push(refImage);
@@ -104,7 +141,18 @@ router.post('/', requireAuth, (req, res) => {
     );
   };
 
-  if (!braiderId) return finish(null);
+  const withBraider = (braiderName) => {
+    if (!slotId) return finish(braiderName, null);
+    db.get('SELECT * FROM availability WHERE id = ?', [slotId], (err, slot) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (!slot) return res.status(404).json({ error: 'That time slot no longer exists' });
+      if (slot.braiderId !== braiderId) return res.status(400).json({ error: 'Slot does not belong to this braider' });
+      if (slot.booked) return res.status(409).json({ error: 'That time slot was just taken. Pick another.' });
+      finish(braiderName, slot);
+    });
+  };
+
+  if (!braiderId) return withBraider(null);
 
   db.get(
     "SELECT name FROM users WHERE id = ? AND userType = 'braider'",
@@ -112,7 +160,7 @@ router.post('/', requireAuth, (req, res) => {
     (err, braider) => {
       if (err) return res.status(500).json({ error: 'Database error' });
       if (!braider) return res.status(404).json({ error: 'Braider not found' });
-      finish(braider.name);
+      withBraider(braider.name);
     }
   );
 });
@@ -141,6 +189,11 @@ router.patch('/:id', requireAuth, (req, res) => {
 
     db.run('UPDATE bookings SET status = ? WHERE id = ?', [status, req.params.id], (uErr) => {
       if (uErr) return res.status(500).json({ error: 'Update failed' });
+
+      // Free the reserved slot if the booking is declined or cancelled.
+      if ((status === 'declined' || status === 'cancelled') && booking.slotId) {
+        db.run('UPDATE availability SET booked = 0, bookingId = NULL WHERE id = ?', [booking.slotId]);
+      }
 
       // Let the other party know in chat.
       const other = isClient ? booking.braiderId : booking.userId;

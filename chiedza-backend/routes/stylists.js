@@ -20,12 +20,13 @@ function braiderToStylist(b, portfolio = []) {
     imageUrl: b.profileImage || '',
     location: b.location || '',
     available: b.available == null ? 1 : b.available,
+    serviceTime: b.serviceTime || '',
     portfolio,
   };
 }
 
 const BRAIDER_COLUMNS =
-  "SELECT id, name, specialty, experience, startingPrice, phone, bio, profileImage, location, available FROM users WHERE userType = 'braider'";
+  "SELECT id, name, specialty, experience, startingPrice, phone, bio, profileImage, location, available, serviceTime FROM users WHERE userType = 'braider'";
 
 // Get all stylists: real braider accounts first, then the demo/seed pros
 router.get('/', (req, res) => {
@@ -65,7 +66,7 @@ router.get('/:id', (req, res) => {
     if (seeded) return res.json({ ...seeded, userId: null, portfolio: [] });
 
     db.get(
-      "SELECT id, name, specialty, experience, startingPrice, phone, bio, profileImage, location, available FROM users WHERE id = ? AND userType = 'braider'",
+      "SELECT id, name, specialty, experience, startingPrice, phone, bio, profileImage, location, available, serviceTime FROM users WHERE id = ? AND userType = 'braider'",
       [req.params.id],
       (e2, b) => {
         if (e2 || !b) return res.status(404).json({ error: 'Stylist not found' });

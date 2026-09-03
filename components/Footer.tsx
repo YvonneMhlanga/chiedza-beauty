@@ -32,6 +32,7 @@ export default function Footer() {
               <li><Link href="/salons" className="hover:text-secondary transition">Find Salons</Link></li>
               <li><Link href="/styles" className="hover:text-secondary transition">Browse Styles</Link></li>
               <li><Link href="/stylists" className="hover:text-secondary transition">Braiders</Link></li>
+              <li><Link href="/about" className="hover:text-secondary transition">About Us</Link></li>
               <li><Link href="/auth/register" className="hover:text-secondary transition">Become a Braider</Link></li>
             </ul>
           </div>

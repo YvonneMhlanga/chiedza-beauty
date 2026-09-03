@@ -10,12 +10,12 @@ import {
   Shield,
   ArrowRight,
   Scissors,
-  Flower2,
-  Hand,
-  Droplets,
   Waves,
-  Brush,
-  Grip,
+  Flower2,
+  RefreshCw,
+  Crown,
+  Layers,
+  Wind,
   UserPlus,
   CalendarCheck,
   Smile,
@@ -31,14 +31,15 @@ import { useApi } from '@/lib/useApi';
 const HERO_IMAGE = '/images/hero.jpg';
 const TRENDING_THUMB = '/images/styles/knotless.jpg';
 
+// Pilot is hair only — these are braiding / hair style types, not beauty categories.
 const categories = [
-  { label: 'Braids', Icon: Scissors },
-  { label: 'Natural Hair', Icon: Flower2 },
-  { label: 'Nails', Icon: Hand },
-  { label: 'Hair Treatments', Icon: Droplets },
-  { label: 'Locs', Icon: Waves },
-  { label: 'Makeup', Icon: Brush },
-  { label: 'More', Icon: Grip },
+  { label: 'Box Braids', Icon: Scissors },
+  { label: 'Knotless', Icon: Waves },
+  { label: 'Cornrows', Icon: Layers },
+  { label: 'Twists', Icon: Wind },
+  { label: 'Locs', Icon: Crown },
+  { label: 'Weaves', Icon: Flower2 },
+  { label: 'Maintenance', Icon: RefreshCw },
 ];
 
 const steps = [
@@ -228,12 +229,12 @@ export default function Home() {
       <section className="py-16 bg-cream">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-black text-primary">Find what you need</h2>
+            <h2 className="text-3xl font-black text-primary">Browse by style</h2>
             <Link
               href="/styles"
               className="text-accent font-bold hover:opacity-80 flex items-center gap-2 text-sm"
             >
-              View all categories <ArrowRight className="w-4 h-4" />
+              View all styles <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 

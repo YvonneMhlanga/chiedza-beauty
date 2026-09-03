@@ -1,9 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { X, CalendarCheck, ImagePlus } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, type Slot } from '@/lib/api';
 import { getToken, getStoredUser } from '@/lib/auth';
 
 interface Props {
@@ -14,6 +14,13 @@ interface Props {
   styleTitle?: string;
   onClose: () => void;
   onBooked?: () => void;
+}
+
+function fmtDate(d: string) {
+  const dt = new Date(d + 'T00:00:00');
+  return Number.isNaN(dt.getTime())
+    ? d
+    : dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 export default function BookingModal({
@@ -28,6 +35,10 @@ export default function BookingModal({
   const token = getToken();
   const me = getStoredUser();
 
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoaded, setSlotsLoaded] = useState(false);
+  const [slotId, setSlotId] = useState('');
+
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [service, setService] = useState(defaultService || styleTitle || '');
@@ -41,6 +52,14 @@ export default function BookingModal({
 
   const today = new Date().toISOString().split('T')[0];
 
+  useEffect(() => {
+    api
+      .getBraiderSlots(braiderId)
+      .then((s) => setSlots(s))
+      .catch(() => {})
+      .finally(() => setSlotsLoaded(true));
+  }, [braiderId]);
+
   const pickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
     setFile(f);
@@ -50,11 +69,21 @@ export default function BookingModal({
     });
   };
 
+  const useSlots = slots.length > 0;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    if (!date || !service.trim()) {
-      setError('Pick a date and describe the style you want.');
+    if (!service.trim()) {
+      setError('Describe the style you want.');
+      return;
+    }
+    if (useSlots && !slotId) {
+      setError('Pick an available time slot.');
+      return;
+    }
+    if (!useSlots && !date) {
+      setError('Pick a date.');
       return;
     }
     setSaving(true);
@@ -69,11 +98,10 @@ export default function BookingModal({
         braiderId,
         styleId,
         styleTitle,
-        date,
-        time,
         service: service.trim(),
         note: note.trim(),
         refImage,
+        ...(useSlots ? { slotId } : { date, time }),
       });
       setDone(true);
       onBooked?.();
@@ -84,13 +112,19 @@ export default function BookingModal({
     }
   };
 
+  // group slots by date for display
+  const byDate: Record<string, Slot[]> = {};
+  slots.forEach((s) => {
+    (byDate[s.date] = byDate[s.date] || []).push(s);
+  });
+
   return (
     <div
       className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-md p-6 relative"
+        className="bg-white rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -118,8 +152,8 @@ export default function BookingModal({
             </div>
             <h2 className="text-xl font-black text-primary mb-2">Request sent</h2>
             <p className="text-gray-600 text-sm mb-5">
-              {braiderName} will see it in their dashboard and can confirm or decline. You&apos;ll
-              see updates in Messages and Bookings.
+              {braiderName} will see it in their dashboard and can confirm or decline. You&apos;ll see
+              updates in Messages and Bookings.
             </p>
             <div className="flex gap-3 justify-center">
               <Link href="/bookings" className="btn-primary text-sm">
@@ -133,7 +167,13 @@ export default function BookingModal({
         ) : (
           <>
             <h2 className="text-xl font-black text-primary mb-1">Request a booking</h2>
-            <p className="text-gray-500 text-sm mb-5">with {braiderName}</p>
+            <p className="text-gray-500 text-sm mb-4">with {braiderName}</p>
+
+            {me.isStudent ? (
+              <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-2.5 text-xs mb-4">
+                🎓 Student verified — you get <b>10% off</b> your first visit.
+              </div>
+            ) : null}
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-4">
@@ -142,28 +182,63 @@ export default function BookingModal({
             )}
 
             <form onSubmit={submit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              {/* Time selection */}
+              {!slotsLoaded ? (
+                <p className="text-sm text-gray-400">Loading available times…</p>
+              ) : useSlots ? (
                 <div>
-                  <label className="block text-sm font-semibold mb-1.5">Date</label>
-                  <input
-                    type="date"
-                    min={today}
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    required
-                    className="input-base"
-                  />
+                  <label className="block text-sm font-semibold mb-1.5">Pick a time slot</label>
+                  <div className="space-y-3 max-h-52 overflow-y-auto pr-1">
+                    {Object.entries(byDate).map(([d, list]) => (
+                      <div key={d}>
+                        <p className="text-xs font-bold text-gray-500 mb-1.5">{fmtDate(d)}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {list.map((s) => (
+                            <button
+                              type="button"
+                              key={s.id}
+                              onClick={() => setSlotId(s.id)}
+                              className={`px-3 py-1.5 rounded-lg text-sm border-2 transition ${
+                                slotId === s.id
+                                  ? 'border-accent bg-accent text-white'
+                                  : 'border-gray-200 text-primary hover:border-accent'
+                              }`}
+                            >
+                              {s.startTime}
+                              {s.endTime ? `–${s.endTime}` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Booked slots are hidden. Your slot is held once the braider confirms.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1.5">Preferred time</label>
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="input-base"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Date</label>
+                    <input
+                      type="date"
+                      min={today}
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="input-base"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5">Preferred time</label>
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      className="input-base"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5">Style / service</label>
@@ -178,16 +253,8 @@ export default function BookingModal({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1.5">
-                  Reference photo (optional)
-                </label>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={pickFile}
-                />
+                <label className="block text-sm font-semibold mb-1.5">Reference photo (optional)</label>
+                <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={pickFile} />
                 {preview ? (
                   <div className="relative w-28 h-28">
                     <img

@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Phone, Mail, Camera, CheckCircle, Circle, X, Plus, MessageCircle } from 'lucide-react';
+import { MapPin, Phone, Mail, Camera, CheckCircle, Circle, X, Plus, MessageCircle, Clock } from 'lucide-react';
 import Avatar from '@/components/Avatar';
-import { api, assetUrl, type UserType, type PortfolioItem } from '@/lib/api';
+import { api, assetUrl, type UserType, type PortfolioItem, type Slot } from '@/lib/api';
 import { getToken, getStoredUser, patchStoredUser } from '@/lib/auth';
+
+const HAIR_TYPES = ['Natural', 'Relaxed', 'Locs', 'Currently braided', 'Transitioning', 'Not sure'];
 
 type Profile = {
   name: string;
+  username: string;
   email: string;
   userType: UserType;
   phone: string;
@@ -18,11 +21,18 @@ type Profile = {
   specialty: string;
   experience: string;
   startingPrice: string;
+  serviceTime: string;
+  dateOfBirth: string;
+  occupation: string;
+  hairType: string;
+  hairProducts: string;
   available: boolean;
+  isStudent: boolean;
 };
 
 const EMPTY: Profile = {
   name: '',
+  username: '',
   email: '',
   userType: 'client',
   phone: '',
@@ -32,7 +42,13 @@ const EMPTY: Profile = {
   specialty: '',
   experience: '',
   startingPrice: '',
+  serviceTime: '',
+  dateOfBirth: '',
+  occupation: '',
+  hairType: '',
+  hairProducts: '',
   available: true,
+  isStudent: false,
 };
 
 export default function ProfilePage() {
@@ -48,6 +64,15 @@ export default function ProfilePage() {
   const avatarInput = useRef<HTMLInputElement>(null);
   const workInput = useRef<HTMLInputElement>(null);
 
+  // Braider availability
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [newSlot, setNewSlot] = useState({ date: '', startTime: '', endTime: '' });
+  const [slotError, setSlotError] = useState<string | null>(null);
+
+  const loadSlots = useCallback((t: string) => {
+    api.getMySlots(t).then(setSlots).catch(() => {});
+  }, []);
+
   useEffect(() => {
     const t = getToken();
     const stored = getStoredUser();
@@ -59,9 +84,11 @@ export default function ProfilePage() {
     setProfile({
       ...EMPTY,
       name: stored.name || '',
+      username: stored.username || '',
       email: stored.email || '',
       userType: stored.userType === 'braider' ? 'braider' : 'client',
       profileImage: stored.profileImage || null,
+      isStudent: Boolean(stored.isStudent),
     });
     setStatus('ready');
 
@@ -71,6 +98,7 @@ export default function ProfilePage() {
         setProfile((prev) => ({
           ...(prev || EMPTY),
           name: me.name || prev?.name || '',
+          username: me.username || '',
           email: me.email || prev?.email || '',
           userType: (me.userType as UserType) || prev?.userType || 'client',
           phone: me.phone || '',
@@ -80,8 +108,15 @@ export default function ProfilePage() {
           specialty: me.specialty || '',
           experience: me.experience || '',
           startingPrice: me.startingPrice || '',
+          serviceTime: me.serviceTime || '',
+          dateOfBirth: me.dateOfBirth || '',
+          occupation: me.occupation || '',
+          hairType: me.hairType || '',
+          hairProducts: me.hairProducts || '',
           available: me.available == null ? true : Boolean(me.available),
+          isStudent: Boolean(me.isStudent),
         }));
+        if (me.userType === 'braider') loadSlots(t);
       })
       .catch(() => {});
 
@@ -89,7 +124,7 @@ export default function ProfilePage() {
       .getPortfolio(t)
       .then(setPortfolio)
       .catch(() => {});
-  }, []);
+  }, [loadSlots]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,15 +138,22 @@ export default function ProfilePage() {
         phone: profile.phone,
         location: profile.location,
         bio: profile.bio,
+        dateOfBirth: profile.dateOfBirth,
       };
       if (profile.userType === 'braider') {
         payload.specialty = profile.specialty;
         payload.experience = profile.experience;
         payload.startingPrice = profile.startingPrice;
+        payload.serviceTime = profile.serviceTime;
         payload.available = profile.available;
+      } else {
+        payload.username = profile.username;
+        payload.occupation = profile.occupation;
+        payload.hairType = profile.hairType;
+        payload.hairProducts = profile.hairProducts;
       }
       await api.updateProfile(token, payload);
-      patchStoredUser({ name: profile.name });
+      patchStoredUser({ name: profile.name, username: profile.username || null });
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save');
@@ -175,6 +217,39 @@ export default function ProfilePage() {
     }
   };
 
+  const addSlot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setSlotError(null);
+    if (!newSlot.date || !newSlot.startTime) {
+      setSlotError('Pick a date and start time.');
+      return;
+    }
+    try {
+      const s = await api.addSlot(token, newSlot);
+      setSlots((list) =>
+        [...list, s].sort((a, b) =>
+          a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date)
+        )
+      );
+      setNewSlot({ date: newSlot.date, startTime: '', endTime: '' });
+    } catch (err) {
+      setSlotError(err instanceof Error ? err.message : 'Could not add slot');
+    }
+  };
+
+  const removeSlot = async (id: string) => {
+    if (!token) return;
+    const prev = slots;
+    setSlots((list) => list.filter((s) => s.id !== id));
+    try {
+      await api.deleteSlot(token, id);
+    } catch (err) {
+      setSlots(prev);
+      setSlotError(err instanceof Error ? err.message : 'Could not remove slot');
+    }
+  };
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-cream">
@@ -213,8 +288,9 @@ export default function ProfilePage() {
           { label: 'Set your main specialty', done: Boolean(p.specialty.trim()) },
           { label: 'Set your starting price', done: Boolean(p.startingPrice.trim()) },
           { label: 'Upload at least one photo of your work', done: portfolio.length > 0 },
+          { label: 'Add at least one available time slot', done: slots.length > 0 },
         ]
-      : []),
+      : [{ label: 'Add your hair type', done: Boolean(p.hairType.trim()) }]),
   ];
   const doneCount = checklist.filter((c) => c.done).length;
   const complete = doneCount === checklist.length;
@@ -243,10 +319,18 @@ export default function ProfilePage() {
             </button>
           </div>
           <div className="text-center sm:text-left">
-            <span className="inline-block bg-secondary text-primary text-xs font-black px-3 py-1 rounded-full uppercase tracking-wide mb-2">
-              {isBraider ? 'Braider' : 'Client'}
-            </span>
+            <div className="flex gap-2 justify-center sm:justify-start mb-2">
+              <span className="inline-block bg-secondary text-primary text-xs font-black px-3 py-1 rounded-full uppercase tracking-wide">
+                {isBraider ? 'Braider' : 'Client'}
+              </span>
+              {p.isStudent && (
+                <span className="inline-block bg-green-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wide">
+                  🎓 Student
+                </span>
+              )}
+            </div>
             <h1 className="text-3xl font-black">{p.name || 'Your name'}</h1>
+            {p.username && <p className="text-blue-200 text-sm">@{p.username}</p>}
             <p className="text-blue-100 flex items-center gap-2 justify-center sm:justify-start mt-1">
               <Mail className="w-4 h-4" /> {p.email}
             </p>
@@ -345,6 +429,26 @@ export default function ProfilePage() {
                     onChange={(e) => setProfile({ ...p, startingPrice: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Estimated service time</label>
+                  <input
+                    className="input-base"
+                    placeholder="e.g. 4–6 hrs"
+                    value={p.serviceTime}
+                    onChange={(e) => setProfile({ ...p, serviceTime: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Date of birth</label>
+                  <input
+                    type="date"
+                    className="input-base"
+                    value={p.dateOfBirth}
+                    onChange={(e) => setProfile({ ...p, dateOfBirth: e.target.value })}
+                  />
+                </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-3 py-2.5 cursor-pointer">
                     <input
@@ -353,11 +457,69 @@ export default function ProfilePage() {
                       checked={p.available}
                       onChange={(e) => setProfile({ ...p, available: e.target.checked })}
                     />
-                    <span className="text-sm font-semibold text-primary">
-                      Available for bookings
-                    </span>
+                    <span className="text-sm font-semibold text-primary">Available for bookings</span>
                   </label>
                 </div>
+              </div>
+            </>
+          )}
+
+          {!isBraider && (
+            <>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Username</label>
+                  <input
+                    className="input-base"
+                    placeholder="e.g. tariro_n"
+                    value={p.username}
+                    onChange={(e) => setProfile({ ...p, username: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Date of birth</label>
+                  <input
+                    type="date"
+                    className="input-base"
+                    value={p.dateOfBirth}
+                    onChange={(e) => setProfile({ ...p, dateOfBirth: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Occupation</label>
+                  <input
+                    className="input-base"
+                    placeholder="e.g. Student, Nurse"
+                    value={p.occupation}
+                    onChange={(e) => setProfile({ ...p, occupation: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Hair type</label>
+                  <select
+                    className="input-base"
+                    value={p.hairType}
+                    onChange={(e) => setProfile({ ...p, hairType: e.target.value })}
+                  >
+                    <option value="">Select…</option>
+                    {HAIR_TYPES.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-2">Hair products you currently use</label>
+                <input
+                  className="input-base"
+                  placeholder="e.g. Cantu leave-in, shea butter"
+                  value={p.hairProducts}
+                  onChange={(e) => setProfile({ ...p, hairProducts: e.target.value })}
+                />
               </div>
             </>
           )}
@@ -485,6 +647,81 @@ export default function ProfilePage() {
               <Link href="/styles" className="btn-outline-accent inline-block text-sm">
                 Browse styles
               </Link>
+            </div>
+          )}
+
+          {isBraider && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="text-lg font-black text-primary mb-1 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-accent" /> My available hours
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Add the time slots you can take clients. When someone books a slot it disappears from
+                the list so no one else can take it.
+              </p>
+
+              {slotError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs mb-3">
+                  {slotError}
+                </div>
+              )}
+
+              <form onSubmit={addSlot} className="grid grid-cols-2 gap-2 mb-4">
+                <input
+                  type="date"
+                  className="input-base col-span-2"
+                  value={newSlot.date}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setNewSlot({ ...newSlot, date: e.target.value })}
+                />
+                <input
+                  type="time"
+                  className="input-base"
+                  aria-label="Start time"
+                  value={newSlot.startTime}
+                  onChange={(e) => setNewSlot({ ...newSlot, startTime: e.target.value })}
+                />
+                <input
+                  type="time"
+                  className="input-base"
+                  aria-label="End time (optional)"
+                  value={newSlot.endTime}
+                  onChange={(e) => setNewSlot({ ...newSlot, endTime: e.target.value })}
+                />
+                <button type="submit" className="btn-primary text-sm col-span-2 py-2">
+                  Add slot
+                </button>
+              </form>
+
+              {slots.length === 0 ? (
+                <p className="text-sm text-gray-400">No slots yet.</p>
+              ) : (
+                <ul className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {slots.map((s) => (
+                    <li
+                      key={s.id}
+                      className={`flex items-center justify-between text-sm rounded-lg px-3 py-2 ${
+                        s.booked ? 'bg-gray-100 text-gray-400' : 'bg-cream'
+                      }`}
+                    >
+                      <span>
+                        {s.date} · {s.startTime}
+                        {s.endTime ? `–${s.endTime}` : ''}
+                        {s.booked && <span className="ml-2 font-bold">booked</span>}
+                      </span>
+                      {!s.booked && (
+                        <button
+                          onClick={() => removeSlot(s.id)}
+                          aria-label="Remove slot"
+                          className="text-accent hover:opacity-70"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

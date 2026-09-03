@@ -116,6 +116,17 @@ function schemaStatements(d) {
       mime TEXT,
       createdAt ${TS}
     )`,
+    // Braider availability — one row per bookable time slot.
+    `CREATE TABLE IF NOT EXISTS availability (
+      id TEXT PRIMARY KEY,
+      braiderId TEXT NOT NULL,
+      date TEXT NOT NULL,
+      startTime TEXT NOT NULL,
+      endTime TEXT,
+      booked INTEGER DEFAULT 0,
+      bookingId TEXT,
+      createdAt ${TS}
+    )`,
   ];
 }
 
@@ -130,11 +141,21 @@ function migrationStatements(d) {
     `ALTER TABLE users ADD COLUMN ${IFNOT}available INTEGER DEFAULT 1`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}resetToken TEXT`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}resetExpires ${BIG}`,
+    // Client + braider registration details (added for the HIT/Belvedere pilot)
+    `ALTER TABLE users ADD COLUMN ${IFNOT}username TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}dateOfBirth TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}occupation TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}hairType TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}hairProducts TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}serviceTime TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}isStudent INTEGER DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}isAdmin INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}braiderId TEXT`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}styleId TEXT`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}styleTitle TEXT`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}note TEXT`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}refImage TEXT`,
+    `ALTER TABLE bookings ADD COLUMN ${IFNOT}slotId TEXT`,
   ];
 }
 
@@ -166,6 +187,8 @@ if (usePg) {
     'fromUserId', 'toUserId', 'readAt', 'resetToken', 'resetExpires', 'braiderId',
     'styleId', 'styleTitle', 'refImage', 'clientName', 'clientPhone', 'clientImage',
     'braiderName', 'braiderPhone', 'braiderImage', 'salonName',
+    'dateOfBirth', 'hairType', 'hairProducts', 'serviceTime', 'isStudent', 'isAdmin',
+    'startTime', 'endTime', 'bookingId', 'slotId',
   ];
   const LOWER_TO_CAMEL = Object.fromEntries(CAMEL.map((c) => [c.toLowerCase(), c]));
   const remap = (row) => {

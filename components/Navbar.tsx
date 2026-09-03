@@ -40,8 +40,11 @@ export default function Navbar() {
     { label: 'Styles', href: '/styles' },
     { label: 'Braiders', href: '/stylists' },
     { label: 'How It Works', href: '/#how-it-works' },
+    { label: 'About', href: '/about' },
     { label: 'Contact', href: 'mailto:chiedzabeauty1@gmail.com' },
   ];
+
+  const isAdmin = Boolean(user?.isAdmin);
 
   const roleLabel = user?.userType === 'braider' ? 'Braider' : 'Client';
 
@@ -73,6 +76,14 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-4">
             {user ? (
               <>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="text-secondary font-bold text-sm hover:opacity-80"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <Link
                   href="/bookings"
                   className="text-white hover:text-secondary transition"
@@ -170,6 +181,15 @@ export default function Navbar() {
                   >
                     <CalendarCheck className="w-5 h-5" /> Bookings
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsOpen(false)}
+                      className="block text-secondary font-bold"
+                    >
+                      Admin dashboard
+                    </Link>
+                  )}
                   <Link
                     href="/profile"
                     onClick={() => setIsOpen(false)}

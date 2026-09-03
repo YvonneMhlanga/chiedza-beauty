@@ -51,6 +51,8 @@ app.use('/api/stylists', require('./routes/stylists'));
 app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/availability', require('./routes/availability'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/api/health', (req, res) => {
