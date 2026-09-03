@@ -7,6 +7,7 @@ import Avatar from '@/components/Avatar';
 import BookingModal from '@/components/BookingModal';
 import { api, assetUrl } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { workTypeLabel } from '@/lib/workTypes';
 
 export default function StylistDetailPage({ params }: { params: { id: string } }) {
   const { data: s, loading, error } = useApi(() => api.getStylist(params.id), [params.id]);
@@ -63,6 +64,7 @@ export default function StylistDetailPage({ params }: { params: { id: string } }
                     <MapPin className="w-4 h-4" /> {s.location || `Salon #${s.salonId}`}
                   </span>
                 )}
+                {workTypeLabel(s.workType) && <span>{workTypeLabel(s.workType)}</span>}
                 {s.rating > 0 && (
                   <span className="inline-flex items-center gap-1.5">
                     <Star className="w-4 h-4 fill-secondary text-secondary" /> {s.rating} ({s.reviews})

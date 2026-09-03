@@ -22,11 +22,11 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import SalonCard from '@/components/SalonCard';
 import StyleCard from '@/components/StyleCard';
 import Avatar from '@/components/Avatar';
-import { api } from '@/lib/api';
+import { api, assetUrl } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { workTypeLabel } from '@/lib/workTypes';
 
 const HERO_IMAGE = '/images/hero.jpg';
 const TRENDING_THUMB = '/images/styles/knotless.jpg';
@@ -101,12 +101,12 @@ export default function Home() {
 
   const locations = ['Harare', 'Bulawayo', 'Mutare', 'Gweru', 'Kwekwe'];
 
-  const { data: salons } = useApi(() => api.getSalons(), []);
+  const { data: braiders } = useApi(() => api.getStylists(), []);
   const { data: styles } = useApi(() => api.getStyles(), []);
-  const featuredSalons = (salons ?? []).slice(0, 5);
+  const featuredBraiders = (braiders ?? []).slice(0, 6);
   const trendingStyles = (styles ?? []).slice(0, 3);
 
-  const handleSearch = () => router.push('/salons');
+  const handleSearch = () => router.push('/stylists');
 
   return (
     <>
@@ -128,13 +128,13 @@ export default function Home() {
               </h1>
 
               <p className="text-lg text-gray-600 mb-8 max-w-md leading-relaxed">
-                Discover trusted salons, explore real styles and connect with braiders
-                across Zimbabwe.
+                Find a braider near you — at a salon, working from home, or one who
+                travels to you. See real work, real prices, and book a time.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/salons" className="btn-primary text-center">
-                  Find a Salon
+                <Link href="/stylists" className="btn-primary text-center">
+                  Find a Braider
                 </Link>
                 <Link href="/styles" className="btn-outline-accent text-center">
                   Explore Styles
@@ -280,28 +280,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* POPULAR SALONS */}
+      {/* BRAIDERS NEAR YOU */}
       <section className="py-8 bg-cream">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-3xl font-black text-primary">Popular Salons Near You</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-3xl font-black text-primary">Braiders near you</h2>
             <Link
-              href="/salons"
+              href="/stylists"
               className="text-accent font-bold hover:opacity-80 flex items-center gap-2 text-sm"
             >
-              View all salons <ArrowRight className="w-4 h-4" />
+              View all braiders <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+          <p className="text-gray-600 mb-8">
+            At a salon, from home, at the market, or coming to you — browse by area and price.
+          </p>
 
-          {featuredSalons.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-              {featuredSalons.map((salon) => (
-                <SalonCard key={salon.id} salon={salon} />
+          {featuredBraiders.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {featuredBraiders.map((b) => (
+                <Link
+                  key={b.id}
+                  href={`/stylists/${b.id}`}
+                  className="bg-white rounded-2xl border border-gray-100 p-5 flex gap-4 hover:shadow-md transition"
+                >
+                  <Avatar src={assetUrl(b.imageUrl) || b.imageUrl} name={b.name} className="w-16 h-16 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-primary truncate">{b.name}</p>
+                    <p className="text-accent text-sm font-semibold truncate">{b.specialty}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-gray-500">
+                      {b.location && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {b.location}
+                        </span>
+                      )}
+                      {workTypeLabel(b.workType) && <span>{workTypeLabel(b.workType)}</span>}
+                      <span className="font-semibold text-primary">From {b.startingPrice}</span>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           ) : (
-            <p className="text-gray-500">Loading salons…</p>
+            <p className="text-gray-500">Loading braiders…</p>
           )}
+
+          <p className="text-sm text-gray-500 mt-6">
+            Prefer a physical shop?{' '}
+            <Link href="/salons" className="text-accent font-semibold hover:underline">
+              Browse salons &amp; studios
+            </Link>
+          </p>
         </div>
       </section>
 

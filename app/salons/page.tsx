@@ -1,10 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import SalonCard from '@/components/SalonCard';
 import { api } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
-import { Search, MapPin } from 'lucide-react';
+import { Search, MapPin, ArrowRight } from 'lucide-react';
 
 export default function SalonsPage() {
   const { data: salons, loading, error } = useApi(() => api.getSalons(), []);
@@ -30,12 +31,28 @@ export default function SalonsPage() {
       {/* Hero */}
       <div className="bg-primary text-white py-16 px-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl font-black mb-4">Find a Salon</h1>
-          <p className="text-xl text-blue-100">Trusted beauty professionals across Zimbabwe</p>
+          <h1 className="text-5xl font-black mb-4">Salons &amp; studios</h1>
+          <p className="text-xl text-blue-100 max-w-2xl">
+            Braiding businesses with a physical shop across Zimbabwe.
+          </p>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Reframe for the informal market */}
+        <div className="bg-accent/5 border border-accent/20 rounded-2xl p-5 mb-10 flex flex-col sm:flex-row sm:items-center gap-3">
+          <p className="text-sm text-primary flex-1">
+            <span className="font-bold">Not every great braider has a shop.</span> Many work from
+            home, at the market, or travel to you. Browse individual braiders to see how each one works.
+          </p>
+          <Link
+            href="/stylists"
+            className="btn-primary text-sm inline-flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            Browse braiders <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Heart, User, Mail, Lock, CheckCircle, Scissors } from 'lucide-react';
 import { api, type UserType, type RegisterExtras } from '@/lib/api';
 import { setAuth } from '@/lib/auth';
+import { WORK_TYPES } from '@/lib/workTypes';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 const HAIR_TYPES = [
@@ -37,6 +38,7 @@ export default function RegisterPage() {
     location: '',
     experience: '',
     serviceTime: '',
+    workType: '',
     startingPrice: '',
   });
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -67,6 +69,7 @@ export default function RegisterPage() {
             location: form.location,
             experience: form.experience,
             serviceTime: form.serviceTime,
+            workType: form.workType,
             startingPrice: form.startingPrice,
             dateOfBirth: form.dateOfBirth,
           }
@@ -264,6 +267,21 @@ export default function RegisterPage() {
                   </>
                 ) : (
                   <>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">Where do you braid?</label>
+                      <select
+                        value={form.workType}
+                        onChange={(e) => set('workType', e.target.value)}
+                        className="input-base"
+                      >
+                        <option value="">Select…</option>
+                        {WORK_TYPES.map((w) => (
+                          <option key={w.value} value={w.value}>
+                            {w.emoji} {w.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-sm font-semibold mb-2">Service location / area</label>
                       <input

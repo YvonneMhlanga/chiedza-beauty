@@ -6,6 +6,7 @@ import { MapPin, Phone, Mail, Camera, CheckCircle, Circle, X, Plus, MessageCircl
 import Avatar from '@/components/Avatar';
 import { api, assetUrl, type UserType, type PortfolioItem, type Slot } from '@/lib/api';
 import { getToken, getStoredUser, patchStoredUser } from '@/lib/auth';
+import { WORK_TYPES } from '@/lib/workTypes';
 
 const HAIR_TYPES = ['Natural', 'Relaxed', 'Locs', 'Currently braided', 'Transitioning', 'Not sure'];
 
@@ -22,6 +23,7 @@ type Profile = {
   experience: string;
   startingPrice: string;
   serviceTime: string;
+  workType: string;
   dateOfBirth: string;
   occupation: string;
   hairType: string;
@@ -43,6 +45,7 @@ const EMPTY: Profile = {
   experience: '',
   startingPrice: '',
   serviceTime: '',
+  workType: '',
   dateOfBirth: '',
   occupation: '',
   hairType: '',
@@ -109,6 +112,7 @@ export default function ProfilePage() {
           experience: me.experience || '',
           startingPrice: me.startingPrice || '',
           serviceTime: me.serviceTime || '',
+          workType: me.workType || '',
           dateOfBirth: me.dateOfBirth || '',
           occupation: me.occupation || '',
           hairType: me.hairType || '',
@@ -145,6 +149,7 @@ export default function ProfilePage() {
         payload.experience = profile.experience;
         payload.startingPrice = profile.startingPrice;
         payload.serviceTime = profile.serviceTime;
+        payload.workType = profile.workType;
         payload.available = profile.available;
       } else {
         payload.username = profile.username;
@@ -441,6 +446,21 @@ export default function ProfilePage() {
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-semibold mb-2">Where do you braid?</label>
+                  <select
+                    className="input-base"
+                    value={p.workType}
+                    onChange={(e) => setProfile({ ...p, workType: e.target.value })}
+                  >
+                    <option value="">Select…</option>
+                    {WORK_TYPES.map((w) => (
+                      <option key={w.value} value={w.value}>
+                        {w.emoji} {w.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-semibold mb-2">Date of birth</label>
                   <input
                     type="date"
@@ -449,18 +469,16 @@ export default function ProfilePage() {
                     onChange={(e) => setProfile({ ...p, dateOfBirth: e.target.value })}
                   />
                 </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-3 py-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-5 h-5 accent-accent"
-                      checked={p.available}
-                      onChange={(e) => setProfile({ ...p, available: e.target.checked })}
-                    />
-                    <span className="text-sm font-semibold text-primary">Available for bookings</span>
-                  </label>
-                </div>
               </div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 accent-accent"
+                  checked={p.available}
+                  onChange={(e) => setProfile({ ...p, available: e.target.checked })}
+                />
+                <span className="text-sm font-semibold text-primary">Available for bookings</span>
+              </label>
             </>
           )}
 

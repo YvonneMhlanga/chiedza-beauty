@@ -84,6 +84,7 @@ router.post('/register', (req, res) => {
     location: b.location,
     experience: b.experience,
     serviceTime: b.serviceTime,
+    workType: b.workType,
     startingPrice: b.startingPrice,
   };
   for (const [k, v] of Object.entries(extras)) {
@@ -302,7 +303,7 @@ router.get('/me', (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     db.get(
       `SELECT id, name, email, username, phone, location, bio, profileImage, userType,
-              specialty, experience, startingPrice, available, serviceTime,
+              specialty, experience, startingPrice, available, serviceTime, workType,
               dateOfBirth, occupation, hairType, hairProducts, isStudent, isAdmin
        FROM users WHERE id = ?`,
       [decoded.userId],
@@ -332,8 +333,8 @@ router.put('/profile', (req, res) => {
     // form never wipes braider-only columns and vice versa.
     const allowed = [
       'name', 'username', 'phone', 'location', 'bio', 'specialty', 'experience',
-      'startingPrice', 'available', 'serviceTime', 'dateOfBirth', 'occupation',
-      'hairType', 'hairProducts',
+      'startingPrice', 'available', 'serviceTime', 'workType', 'dateOfBirth',
+      'occupation', 'hairType', 'hairProducts',
     ];
     const sets = [];
     const vals = [];

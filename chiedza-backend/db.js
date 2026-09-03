@@ -148,6 +148,7 @@ function migrationStatements(d) {
     `ALTER TABLE users ADD COLUMN ${IFNOT}hairType TEXT`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}hairProducts TEXT`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}serviceTime TEXT`,
+    `ALTER TABLE users ADD COLUMN ${IFNOT}workType TEXT`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}isStudent INTEGER DEFAULT 0`,
     `ALTER TABLE users ADD COLUMN ${IFNOT}isAdmin INTEGER DEFAULT 0`,
     `ALTER TABLE bookings ADD COLUMN ${IFNOT}braiderId TEXT`,
@@ -187,7 +188,7 @@ if (usePg) {
     'fromUserId', 'toUserId', 'readAt', 'resetToken', 'resetExpires', 'braiderId',
     'styleId', 'styleTitle', 'refImage', 'clientName', 'clientPhone', 'clientImage',
     'braiderName', 'braiderPhone', 'braiderImage', 'salonName',
-    'dateOfBirth', 'hairType', 'hairProducts', 'serviceTime', 'isStudent', 'isAdmin',
+    'dateOfBirth', 'hairType', 'hairProducts', 'serviceTime', 'workType', 'isStudent', 'isAdmin',
     'startTime', 'endTime', 'bookingId', 'slotId',
   ];
   const LOWER_TO_CAMEL = Object.fromEntries(CAMEL.map((c) => [c.toLowerCase(), c]));

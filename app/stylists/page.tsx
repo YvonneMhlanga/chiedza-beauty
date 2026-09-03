@@ -7,6 +7,7 @@ import Avatar from '@/components/Avatar';
 import BookingModal from '@/components/BookingModal';
 import { api, assetUrl, type Stylist } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { workTypeLabel } from '@/lib/workTypes';
 
 // Fallback work samples for the seeded demo pros (who have no uploaded portfolio).
 const DEMO_PORTFOLIO = [
@@ -81,6 +82,9 @@ export default function StylistsPage() {
                               <MapPin className="w-4 h-4 text-accent" />
                               {s.location || `Salon #${s.salonId}`}
                             </span>
+                          )}
+                          {workTypeLabel(s.workType) && (
+                            <span className="text-primary font-semibold">{workTypeLabel(s.workType)}</span>
                           )}
                           <span className="text-primary font-semibold">
                             From <span className="text-accent">{s.startingPrice}</span>

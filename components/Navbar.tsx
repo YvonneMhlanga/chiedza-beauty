@@ -36,9 +36,9 @@ export default function Navbar() {
   };
 
   const navLinks = [
-    { label: 'Salons', href: '/salons' },
-    { label: 'Styles', href: '/styles' },
     { label: 'Braiders', href: '/stylists' },
+    { label: 'Styles', href: '/styles' },
+    { label: 'Salons', href: '/salons' },
     { label: 'How It Works', href: '/#how-it-works' },
     { label: 'About', href: '/about' },
     { label: 'Contact', href: 'mailto:chiedzabeauty1@gmail.com' },

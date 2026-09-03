@@ -5,6 +5,31 @@
 const db = require('./db');
 const { salons, styles, stylists } = require('./data/seed-data');
 
+// Pilot is hair only — strip non-hair services from any existing demo salons
+// (runs on every boot, so old data on a hosted DB gets cleaned too).
+function normalizeDemoSalons() {
+  const NON_HAIR = /nail|lash|makeup|make-up|brow|wax|pedicure|manicure|facial/i;
+  db.all('SELECT id, services FROM salons', [], (err, rows) => {
+    if (err) return;
+    (rows || []).forEach((r) => {
+      let arr;
+      try {
+        arr = JSON.parse(r.services);
+      } catch {
+        return;
+      }
+      if (!Array.isArray(arr)) return;
+      const clean = arr.filter((s) => !NON_HAIR.test(String(s)));
+      if (clean.length !== arr.length) {
+        db.run('UPDATE salons SET services = ? WHERE id = ?', [
+          JSON.stringify(clean.length ? clean : ['Braids']),
+          r.id,
+        ]);
+      }
+    });
+  });
+}
+
 module.exports = function seedIfEmpty() {
   db.get('SELECT COUNT(*) AS n FROM salons', [], (err, row) => {
     if (err) {
@@ -12,7 +37,10 @@ module.exports = function seedIfEmpty() {
       return;
     }
     const count = row ? Number(row.n ?? row.count ?? 0) : 0;
-    if (count > 0) return; // already has content
+    if (count > 0) {
+      normalizeDemoSalons();
+      return; // already has content
+    }
 
     console.log('📦 Empty database — seeding demo salons/styles/stylists…');
 

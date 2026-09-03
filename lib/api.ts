@@ -57,6 +57,7 @@ export interface Stylist {
   location?: string;
   available?: number;
   serviceTime?: string;
+  workType?: string;
   portfolio?: string[];
 }
 
@@ -82,6 +83,7 @@ export interface Me extends AuthUser {
   startingPrice?: string | null;
   available?: number;
   serviceTime?: string | null;
+  workType?: string | null;
   dateOfBirth?: string | null;
   occupation?: string | null;
   hairType?: string | null;
@@ -97,6 +99,7 @@ export interface RegisterExtras {
   location?: string;
   experience?: string;
   serviceTime?: string;
+  workType?: string;
   startingPrice?: string;
 }
 
